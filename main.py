@@ -3,6 +3,7 @@ import numpy as np
 import os
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import roc_auc_score, precision_score, recall_score, precision_recall_curve
 from sklearn.calibration import calibration_curve
 
@@ -71,6 +72,29 @@ print(f"Precision (threshold=0.5): {precision_10:.3f}")
 print(f"Recall (threshold=0.5): {recall_10:.3f}")
 print("\nCalibration curve (prob_pred vs prob_true):")
 for bp, bt in zip(prob_pred, prob_true):
+    print(f" {bp:.2f} -> {bt:.2f}")
+
+# Gradient-Boosted Trees baseline
+gb_model = GradientBoostingClassifier(random_state=42)
+gb_model.fit(X_train, y_train)
+y_proba_gb = gb_model.predict_proba(X_test)[:, 1]
+y_pred_gb = (y_proba_gb >= 0.5).astype(int)
+
+# Metrics for GBT
+auroc_gb = roc_auc_score(y_test, y_proba_gb)
+# Compute precision@10%
+k = int(len(y_proba_gb) * 0.10)
+top_k_idx = np.argsort(y_proba_gb)[::-1][:k]
+precision10_gb = y_test[top_k_idx].sum() / k
+
+# Calibration for GBT
+prob_true_gb, prob_pred_gb = calibration_curve(y_test, y_proba_gb, n_bins=10)
+
+# Print GBT summary
+print(f"\nGradient-Boosted Trees AUROC: {auroc_gb:.3f}")
+print(f"Precision@10%: {precision10_gb:.3f}")
+print("\nCalibration curve (GBT prob_pred vs prob_true):")
+for bp, bt in zip(prob_pred_gb, prob_true_gb):
     print(f" {bp:.2f} -> {bt:.2f}")
 
 print("\nTop 5 False Positives:")
