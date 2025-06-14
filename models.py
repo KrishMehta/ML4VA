@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.metrics import roc_auc_score, precision_score, recall_score
+from sklearn.metrics import roc_auc_score, precision_score, recall_score, accuracy_score, f1_score
 import numpy as np
 from typing import Tuple, Dict, Any
 
@@ -82,39 +82,50 @@ class ModelTrainer:
             'recall': recall_score(y_train.numpy(), (y_proba >= 0.5).astype(int))
         }
 
-    def evaluate_models(self,
-                        X_test: np.ndarray,
-                        y_test: np.ndarray,
-                        X_test_gnn: torch.Tensor = None,
-                        edge_index_test: torch.Tensor = None) -> Dict[str, Dict[str, float]]:
+    def evaluate_models(self, X_test: np.ndarray, y_test: np.ndarray, X_test_gnn: torch.Tensor, edge_index_test: torch.Tensor) -> Dict:
         """Evaluate all models on test data."""
-        results = {}
-
-        # Evaluate LR
+        # Convert test data to tensors
+        X_test_tensor = torch.FloatTensor(X_test)
+        
+        # Get predictions
+        y_pred_lr = self.lr_model.predict(X_test)
+        y_pred_gbt = self.gbt_model.predict(X_test)
         y_proba_lr = self.lr_model.predict_proba(X_test)[:, 1]
-        results['lr'] = {
-            'auroc': roc_auc_score(y_test, y_proba_lr),
-            'precision': precision_score(y_test, (y_proba_lr >= 0.5).astype(int)),
-            'recall': recall_score(y_test, (y_proba_lr >= 0.5).astype(int))
-        }
-
-        # Evaluate GBT
         y_proba_gbt = self.gbt_model.predict_proba(X_test)[:, 1]
-        results['gbt'] = {
-            'auroc': roc_auc_score(y_test, y_proba_gbt),
-            'precision': precision_score(y_test, (y_proba_gbt >= 0.5).astype(int)),
-            'recall': recall_score(y_test, (y_proba_gbt >= 0.5).astype(int))
-        }
-
-        # Evaluate GNN if available
-        if self.gnn_model is not None and X_test_gnn is not None and edge_index_test is not None:
-            self.gnn_model.eval()
-            with torch.no_grad():
-                y_proba_gnn = self.gnn_model(X_test_gnn, edge_index_test).numpy()
-            results['gnn'] = {
-                'auroc': roc_auc_score(y_test, y_proba_gnn),
-                'precision': precision_score(y_test, (y_proba_gnn >= 0.5).astype(int)),
-                'recall': recall_score(y_test, (y_proba_gnn >= 0.5).astype(int))
+        
+        # Ensure edge_index_test is within bounds
+        n_nodes = X_test_gnn.size(0)
+        edge_index_test = edge_index_test[:, edge_index_test[0] < n_nodes]
+        edge_index_test = edge_index_test[:, edge_index_test[1] < n_nodes]
+        
+        # Get GNN predictions
+        with torch.no_grad():
+            y_proba_gnn = self.gnn_model(X_test_gnn, edge_index_test).numpy()
+        y_pred_gnn = (y_proba_gnn > 0.5).astype(int)
+        
+        # Calculate metrics
+        results = {
+            'lr': {
+                'accuracy': accuracy_score(y_test, y_pred_lr),
+                'precision': precision_score(y_test, y_pred_lr, zero_division=0),
+                'recall': recall_score(y_test, y_pred_lr, zero_division=0),
+                'f1': f1_score(y_test, y_pred_lr, zero_division=0),
+                'auroc': roc_auc_score(y_test, y_proba_lr)
+            },
+            'gbt': {
+                'accuracy': accuracy_score(y_test, y_pred_gbt),
+                'precision': precision_score(y_test, y_pred_gbt, zero_division=0),
+                'recall': recall_score(y_test, y_pred_gbt, zero_division=0),
+                'f1': f1_score(y_test, y_pred_gbt, zero_division=0),
+                'auroc': roc_auc_score(y_test, y_proba_gbt)
+            },
+            'gnn': {
+                'accuracy': accuracy_score(y_test, y_pred_gnn),
+                'precision': precision_score(y_test, y_pred_gnn, zero_division=0),
+                'recall': recall_score(y_test, y_pred_gnn, zero_division=0),
+                'f1': f1_score(y_test, y_pred_gnn, zero_division=0),
+                'auroc': roc_auc_score(y_test, y_proba_gnn)
             }
-
+        }
+        
         return results
