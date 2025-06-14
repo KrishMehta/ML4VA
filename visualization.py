@@ -8,6 +8,7 @@ from dash.dependencies import Input, Output
 import numpy as np
 from typing import Dict, List, Tuple
 import dash
+from shapely.geometry import mapping
 
 
 class Visualizer:
@@ -86,21 +87,39 @@ class Visualizer:
         if 'risk_score' not in gdf.columns:
             raise ValueError("GeoDataFrame must contain 'risk_score' column")
         
+        # Convert to WGS84 for Plotly and ensure geometries are JSON serializable
+        gdf_wgs84 = gdf.to_crs('EPSG:4326').copy()
+
+        # Build GeoJSON manually to avoid serialization issues with Shapely objects
+        features = []
+        for _, row in gdf_wgs84.iterrows():
+            if row.geometry is None:
+                continue
+            features.append({
+                "type": "Feature",
+                "id": row['GEOID'],
+                "properties": {
+                    "GEOID": row['GEOID'],
+                    "risk_score": row['risk_score'],
+                    "NAME": row.get('NAME', '')
+                },
+                "geometry": mapping(row.geometry)
+            })
+
+        geojson = {"type": "FeatureCollection", "features": features}
+
         # Create the choropleth map
         fig = px.choropleth(
-            gdf,
-            geojson=gdf.geometry,
-            locations=gdf.index,
+            gdf_wgs84,
+            geojson=geojson,
+            locations="GEOID",
+            featureidkey="properties.GEOID",
             color='risk_score',
             color_continuous_scale='YlOrRd',
             range_color=(0, 1),
             labels={'risk_score': 'Risk Score'},
             title='Virginia Suicide Risk Map',
-            hover_data={
-                'GEOID': True,
-                'NAME': True,
-                'risk_score': ':.3f'
-            }
+            hover_data={'GEOID': True, 'NAME': True, 'risk_score': ':.3f'}
         )
         
         # Update the layout
