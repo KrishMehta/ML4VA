@@ -18,14 +18,14 @@ This project implements a tract-level suicide risk mapping tool for Virginia by 
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd <repository-name>
+git clone https://github.com/KrishMehta/ML4VA
+cd ML4VA
 ```
 
 2. Create and activate a virtual environment:
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 ```
 
 3. Install dependencies:
@@ -35,15 +35,13 @@ pip install -r requirements.txt
 
 4. Set up environment variables:
 ```bash
-export CENSUS_API_KEY='your-census-api-key'  # On Windows: set CENSUS_API_KEY=your-census-api-key
+export CENSUS_API_KEY='your-census-api-key'
 ```
 
 ## Data Requirements
 
 1. CDC Mortality Data:
    - File: `Mapping_Injury__Overdose__and_Violence_-_Census_Tract.csv`
-   - Source: CDC WONDER Database
-   - Place in project root directory
 
 2. Census API Key:
    - Required for accessing ACS data
@@ -78,18 +76,6 @@ The current implementation includes three models:
 3. Graph Neural Network
 
 Performance metrics (AUROC, precision, recall) are displayed in the dashboard.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
