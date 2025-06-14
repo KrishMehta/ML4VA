@@ -145,9 +145,8 @@ class DataProcessor:
         merged_data = pd.merge(df, acs_data, on='GEOID', how='left')
         merged_data = pd.merge(merged_data, svi_data, on='GEOID', how='left')
 
-        # Create features
+        # Create features (exclude the suicide rate to avoid target leakage)
         feature_cols = [
-            'Rate',  # Current suicide rate
             'B19013_001E',  # Median household income
             'B15003_022E',  # Education metrics
             'B15003_023E',
