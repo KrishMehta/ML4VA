@@ -96,9 +96,20 @@ class DataProcessor:
         return va_svi[['GEOID'] + svi_columns[1:]]
     
     def create_spatial_features(self, df: pd.DataFrame) -> gpd.GeoDataFrame:
-        """Create spatial features using tract geometries."""
-        # Load Virginia tract boundaries
-        va_tracts = gpd.read_file("https://raw.githubusercontent.com/OpenDataIS/virginia-census-tracts/master/virginia-census-tracts.geojson")
+        """Create spatial features using tract geometries from TIGER/Line shapefiles."""
+        # Path to the downloaded TIGER/Line shapefile
+        shapefile_path = 'tl_2021_51_tract/tl_2021_51_tract.shp'
+        if not os.path.exists(shapefile_path):
+            raise FileNotFoundError(
+                f"TIGER/Line shapefile not found: {shapefile_path}. "
+                "Please ensure the shapefile is in the tl_2021_51_tract directory."
+            )
+        
+        # Read the shapefile
+        va_tracts = gpd.read_file(shapefile_path)
+        
+        # Ensure GEOID is in the same format as our data
+        va_tracts['GEOID'] = va_tracts['GEOID'].astype(str)
         
         # Merge with our data
         spatial_df = pd.merge(df, va_tracts, on='GEOID', how='left')
@@ -106,6 +117,14 @@ class DataProcessor:
         # Calculate spatial features
         spatial_df['centroid'] = spatial_df.geometry.centroid
         spatial_df['area'] = spatial_df.geometry.area
+        
+        # Calculate additional spatial features
+        spatial_df['perimeter'] = spatial_df.geometry.length
+        spatial_df['compactness'] = 4 * np.pi * spatial_df['area'] / (spatial_df['perimeter'] ** 2)
+        
+        # Calculate distance to state centroid (Richmond)
+        richmond = Point([-77.4360, 37.5407])  # Richmond coordinates
+        spatial_df['dist_to_richmond'] = spatial_df['centroid'].distance(richmond)
         
         return spatial_df
     
