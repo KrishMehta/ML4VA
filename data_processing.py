@@ -56,13 +56,44 @@ class DataProcessor:
         return acs_data
     
     def get_svi_data(self) -> pd.DataFrame:
-        """Fetch Social Vulnerability Index data."""
-        # SVI data URL (CDC's SVI database)
-        svi_url = "https://www.atsdr.cdc.gov/placeandhealth/svi/data_documentation_download.html"
+        """Fetch and process Social Vulnerability Index data."""
+        # Load SVI data
+        svi_path = 'SVI_2022_US.csv'
+        if not os.path.exists(svi_path):
+            raise FileNotFoundError(f"SVI data file not found: {svi_path}")
         
-        # Note: In practice, you would need to download and process the SVI data
-        # This is a placeholder for the actual implementation
-        return pd.DataFrame()
+        # Read SVI data
+        svi_data = pd.read_csv(svi_path)
+        
+        # Filter for Virginia
+        va_svi = svi_data[svi_data['ST'] == '51']  # 51 is Virginia's FIPS code
+        
+        # Select relevant columns
+        svi_columns = [
+            'FIPS',  # Census tract FIPS code
+            'RPL_THEMES',  # Overall SVI ranking
+            'EP_POV',  # Poverty
+            'EP_UNEMP',  # Unemployment
+            'EP_PCI',  # Per capita income
+            'EP_NOHSDP',  # No high school diploma
+            'EP_AGE65',  # Age 65 and older
+            'EP_AGE17',  # Age 17 and younger
+            'EP_DISABL',  # Disability
+            'EP_SNGPNT',  # Single-parent households
+            'EP_MINRTY',  # Minority
+            'EP_LIMENG',  # Limited English
+            'EP_MUNIT',  # Multi-unit structures
+            'EP_MOBILE',  # Mobile homes
+            'EP_CROWD',  # Crowding
+            'EP_NOVEH',  # No vehicle
+            'EP_GROUPQ'  # Group quarters
+        ]
+        
+        # Create GEOID from FIPS
+        va_svi['GEOID'] = va_svi['FIPS'].astype(str).str.zfill(11)
+        
+        # Select and return relevant columns
+        return va_svi[['GEOID'] + svi_columns[1:]]
     
     def create_spatial_features(self, df: pd.DataFrame) -> gpd.GeoDataFrame:
         """Create spatial features using tract geometries."""
@@ -86,13 +117,37 @@ class DataProcessor:
         
         # Create features
         feature_cols = [
-            'Rate_2022',
+            'Rate_2022',  # Historical suicide rate
             'B19013_001E',  # Median household income
             'B15003_022E',  # Education metrics
             'B15003_023E',
             'B15003_024E',
-            'B15003_025E'
+            'B15003_025E',
+            # SVI features
+            'RPL_THEMES',  # Overall SVI ranking
+            'EP_POV',  # Poverty
+            'EP_UNEMP',  # Unemployment
+            'EP_PCI',  # Per capita income
+            'EP_NOHSDP',  # No high school diploma
+            'EP_AGE65',  # Age 65 and older
+            'EP_AGE17',  # Age 17 and younger
+            'EP_DISABL',  # Disability
+            'EP_SNGPNT',  # Single-parent households
+            'EP_MINRTY',  # Minority
+            'EP_LIMENG',  # Limited English
+            'EP_MUNIT',  # Multi-unit structures
+            'EP_MOBILE',  # Mobile homes
+            'EP_CROWD',  # Crowding
+            'EP_NOVEH',  # No vehicle
+            'EP_GROUPQ'  # Group quarters
         ]
+        
+        # Handle missing values
+        merged_data = merged_data.fillna(merged_data.mean())
+        
+        # Create binary label: top 10% rate in 2023
+        threshold = np.percentile(merged_data['Rate_2023'], 90)
+        merged_data['label'] = (merged_data['Rate_2023'] >= threshold).astype(int)
         
         X = merged_data[feature_cols].values
         y = merged_data['label'].values
