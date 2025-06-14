@@ -69,13 +69,13 @@ class DataProcessor:
         # Filter for Virginia
         va_svi = svi_data[svi_data['ST'] == '51']  # 51 is Virginia's FIPS code
 
-        # Select relevant columns
+        # Select relevant columns (using the correct column names from the SVI data)
         svi_columns = [
             'FIPS',  # Census tract FIPS code
             'RPL_THEMES',  # Overall SVI ranking
-            'EP_POV',  # Poverty
+            'EP_POV150',  # Poverty (150% of poverty threshold)
             'EP_UNEMP',  # Unemployment
-            'EP_PCI',  # Per capita income
+            'EP_HBURD',  # Housing burden (replacing EP_PCI)
             'EP_NOHSDP',  # No high school diploma
             'EP_AGE65',  # Age 65 and older
             'EP_AGE17',  # Age 17 and younger
@@ -146,9 +146,9 @@ class DataProcessor:
             'B15003_025E',
             # SVI features
             'RPL_THEMES',  # Overall SVI ranking
-            'EP_POV',  # Poverty
+            'EP_POV150',  # Poverty (150% of poverty threshold)
             'EP_UNEMP',  # Unemployment
-            'EP_PCI',  # Per capita income
+            'EP_HBURD',  # Housing burden (replacing EP_PCI)
             'EP_NOHSDP',  # No high school diploma
             'EP_AGE65',  # Age 65 and older
             'EP_AGE17',  # Age 17 and younger
