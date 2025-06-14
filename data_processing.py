@@ -7,6 +7,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 import requests
 import json
+from sklearn.impute import SimpleImputer
 
 
 class DataProcessor:
@@ -182,14 +183,19 @@ class DataProcessor:
         numeric_cols = merged_data[feature_cols].select_dtypes(include=[np.number]).columns
         print("Numeric columns available for features:", numeric_cols.tolist())
 
-        # Handle missing values only for numeric columns
-        merged_data[numeric_cols] = merged_data[numeric_cols].fillna(merged_data[numeric_cols].mean())
+        # Create feature matrix
+        X = merged_data[numeric_cols].values
+
+        # Handle missing values using SimpleImputer with a different strategy
+        imputer = SimpleImputer(strategy='constant', fill_value=0)  # Fill missing values with 0
+        X = imputer.fit_transform(X)
 
         # Create binary label: top 10% rate
         threshold = np.percentile(merged_data['Rate'], 90)
-        merged_data['label'] = (merged_data['Rate'] >= threshold).astype(int)
+        y = (merged_data['Rate'] >= threshold).astype(int).values
 
-        X = merged_data[numeric_cols].values
-        y = merged_data['label'].values
+        # Print data shapes for debugging
+        print(f"Feature matrix shape: {X.shape}")
+        print(f"Label vector shape: {y.shape}")
 
         return X, y
