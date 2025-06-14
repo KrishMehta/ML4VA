@@ -3,6 +3,7 @@ import geopandas as gpd
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import json
 from dash import Dash, html, dcc
 from dash.dependencies import Input, Output
 import numpy as np
@@ -87,10 +88,12 @@ class Visualizer:
             raise ValueError("GeoDataFrame must contain 'risk_score' column")
         
         # Create the choropleth map
+        gdf_json = json.loads(gdf.to_json())
         fig = px.choropleth(
             gdf,
-            geojson=gdf.geometry,
-            locations=gdf.index,
+            geojson=gdf_json,
+            locations='GEOID',
+            featureidkey='properties.GEOID',
             color='risk_score',
             color_continuous_scale='YlOrRd',
             range_color=(0, 1),
