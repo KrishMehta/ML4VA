@@ -109,23 +109,31 @@ class DataProcessor:
         # Read the shapefile
         va_tracts = gpd.read_file(shapefile_path)
 
+        # Project to UTM Zone 18N (appropriate for Virginia)
+        va_tracts = va_tracts.to_crs('EPSG:32618')
+
         # Ensure GEOID is in the same format as our data
         va_tracts['GEOID'] = va_tracts['GEOID'].astype(str)
 
-        # Merge with our data
-        spatial_df = pd.merge(df, va_tracts, on='GEOID', how='left')
+        # Convert df to GeoDataFrame by merging with va_tracts
+        spatial_df = gpd.GeoDataFrame(
+            pd.merge(df, va_tracts[['GEOID', 'geometry']], on='GEOID', how='left'),
+            geometry='geometry',
+            crs=va_tracts.crs
+        )
 
         # Calculate spatial features
         spatial_df['centroid'] = spatial_df.geometry.centroid
-        spatial_df['area'] = spatial_df.geometry.area
-
-        # Calculate additional spatial features
-        spatial_df['perimeter'] = spatial_df.geometry.length
+        spatial_df['area'] = spatial_df.geometry.area  # in square meters
+        spatial_df['perimeter'] = spatial_df.geometry.length  # in meters
         spatial_df['compactness'] = 4 * np.pi * spatial_df['area'] / (spatial_df['perimeter'] ** 2)
 
         # Calculate distance to state centroid (Richmond)
-        richmond = Point([-77.4360, 37.5407])  # Richmond coordinates
-        spatial_df['dist_to_richmond'] = spatial_df['centroid'].distance(richmond)
+        richmond = Point([-77.4360, 37.5407])
+        richmond_gdf = gpd.GeoDataFrame(geometry=[richmond], crs='EPSG:4326')
+        richmond_gdf = richmond_gdf.to_crs('EPSG:32618')
+        richmond_point = richmond_gdf.geometry.iloc[0]
+        spatial_df['dist_to_richmond'] = spatial_df['centroid'].distance(richmond_point)  # in meters
 
         return spatial_df
 
@@ -138,7 +146,7 @@ class DataProcessor:
 
         # Create features
         feature_cols = [
-            'Rate_2022',  # Historical suicide rate
+            'Rate',  # Current suicide rate
             'B19013_001E',  # Median household income
             'B15003_022E',  # Education metrics
             'B15003_023E',
@@ -148,7 +156,7 @@ class DataProcessor:
             'RPL_THEMES',  # Overall SVI ranking
             'EP_POV150',  # Poverty (150% of poverty threshold)
             'EP_UNEMP',  # Unemployment
-            'EP_HBURD',  # Housing burden (replacing EP_PCI)
+            'EP_HBURD',  # Housing burden
             'EP_NOHSDP',  # No high school diploma
             'EP_AGE65',  # Age 65 and older
             'EP_AGE17',  # Age 17 and younger
@@ -163,14 +171,25 @@ class DataProcessor:
             'EP_GROUPQ'  # Group quarters
         ]
 
-        # Handle missing values
-        merged_data = merged_data.fillna(merged_data.mean())
+        # Convert all feature columns to numeric, coercing errors to NaN
+        for col in feature_cols:
+            if col in merged_data.columns:
+                merged_data[col] = pd.to_numeric(merged_data[col], errors='coerce')
+            else:
+                print(f"Warning: Column {col} not found in data")
 
-        # Create binary label: top 10% rate in 2023
-        threshold = np.percentile(merged_data['Rate_2023'], 90)
-        merged_data['label'] = (merged_data['Rate_2023'] >= threshold).astype(int)
+        # Select only numeric columns for feature matrix
+        numeric_cols = merged_data[feature_cols].select_dtypes(include=[np.number]).columns
+        print("Numeric columns available for features:", numeric_cols.tolist())
 
-        X = merged_data[feature_cols].values
+        # Handle missing values only for numeric columns
+        merged_data[numeric_cols] = merged_data[numeric_cols].fillna(merged_data[numeric_cols].mean())
+
+        # Create binary label: top 10% rate
+        threshold = np.percentile(merged_data['Rate'], 90)
+        merged_data['label'] = (merged_data['Rate'] >= threshold).astype(int)
+
+        X = merged_data[numeric_cols].values
         y = merged_data['label'].values
 
         return X, y
